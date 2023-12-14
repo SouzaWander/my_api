@@ -28,7 +28,6 @@ defmodule MyApiWeb.UserController do
   end
 
   def update(conn, %{"user" => user_params}) do
-
     with {:ok, %User{} = user} <- Users.update_user(conn.assigns.account.user, user_params) do
       render(conn, :show, user: user)
     end

@@ -77,8 +77,6 @@ defmodule MyApi.Accounts do
 
   """
   def create_account(attrs \\ %{}) do
-    IO.puts("here2")
-
     %Account{}
     |> Account.changeset(attrs)
     |> Repo.insert()

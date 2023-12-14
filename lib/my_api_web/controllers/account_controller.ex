@@ -9,8 +9,6 @@ defmodule MyApiWeb.AccountController do
 
   action_fallback MyApiWeb.FallbackController
 
-
-
   def index(conn, _params) do
     accounts = Accounts.list_accounts()
     render(conn, :index, accounts: accounts)
@@ -43,6 +41,7 @@ defmodule MyApiWeb.AccountController do
   def refresh_session(conn, %{}) do
     token = Guardian.Plug.current_token(conn)
     {:ok, account, new_token} = Guardian.authenticate(token)
+
     conn
     |> Plug.Conn.put_session(:account_id, account.id)
     |> put_status(:ok)
@@ -70,7 +69,9 @@ defmodule MyApiWeb.AccountController do
       true ->
         {:ok, account} = Accounts.update_account(conn.assigns.account, account_params)
         render(conn, :show, account: account)
-      false -> raise ErrorResponse.Unauthorized, message: "Password incorrect."
+
+      false ->
+        raise ErrorResponse.Unauthorized, message: "Password incorrect."
     end
   end
 

@@ -28,7 +28,7 @@ defmodule MyApiWeb.AccountJSON do
     %{
       id: account.id,
       email: account.email,
-      user: UserJSON.show( %{user: account.user})[:data]
+      user: UserJSON.show(%{user: account.user})[:data]
     }
   end
 

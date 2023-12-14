@@ -1,7 +1,6 @@
 defmodule MyApiWeb.Auth.AuthorizedPlug do
   alias MyApiWeb.Auth.ErrorResponse
 
-
   def is_authorized(%{params: %{"account" => params}} = conn, _opts) do
     if conn.assigns.account.id == params["id"] do
       conn

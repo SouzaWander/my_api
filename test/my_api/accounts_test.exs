@@ -1,61 +1,98 @@
 defmodule MyApi.AccountsTest do
-  use MyApi.DataCase
+  use MyApi.Support.DataCase
+  alias MyApi.{Accounts.Account, Accounts}
 
-  alias MyApi.Accounts
+  setup do
+    Ecto.Adapters.SQL.Sandbox.checkout(MyApi.Repo)
+  end
 
-  describe "accounts" do
-    alias MyApi.Accounts.Account
+  describe "create_account/1" do
+    test "success: inserts an account in the database and returns an account" do
+      params = Factory.string_params_for(:account)
 
-    import MyApi.AccountsFixtures
+      assert {:ok, %Account{} = returned_account} = Accounts.create_account(params)
 
-    @invalid_attrs %{email: nil, hash_password: nil}
+      account_from_db = Repo.get(Account, returned_account.id)
 
-    test "list_accounts/0 returns all accounts" do
-      account = account_fixture()
-      assert Accounts.list_accounts() == [account]
+      assert returned_account == account_from_db
+
+      mutated = ["hash_password"]
+
+      for {param_field, expected} <- params, param_field not in mutated do
+        schema_field = String.to_existing_atom(param_field)
+        actual = Map.get(account_from_db, schema_field)
+
+        assert actual == expected,
+               "Values did not matched for field: #{param_field}\nexpected: #{inspect(expected)}\nactual: #{inspect(actual)}"
+      end
+      assert Bcrypt.verify_pass(params["hash_password"], returned_account.hash_password), "Password #{inspect(params["hash_password"])} does not match\nhash: #{inspect(returned_account.hash_password)}"
+      assert account_from_db.inserted_at == account_from_db.updated_at
     end
 
-    test "get_account!/1 returns the account with given id" do
-      account = account_fixture()
-      assert Accounts.get_account!(account.id) == account
+    test "error: returns an error tuple when account can't be created" do
+      missing_params = %{}
+
+      assert {:error, %Changeset{valid?: false}} = Accounts.create_account(missing_params)
+    end
+  end
+
+  describe "get_account/1" do
+    test "success: it returns an account when given a valid UUID" do
+      existing_account = Factory.insert(:account)
+      assert returned_account = Accounts.get_account!(existing_account.id)
+      assert returned_account == existing_account
     end
 
-    test "create_account/1 with valid data creates a account" do
-      valid_attrs = %{email: "some email", hash_password: "some hash_password"}
-
-      assert {:ok, %Account{} = account} = Accounts.create_account(valid_attrs)
-      assert account.email == "some email"
-      assert account.hash_password == "some hash_password"
+    test "error: raises a Ecto.NoResultsError when an account does not exist" do
+      assert_raise Ecto.NoResultsError, fn  ->
+        Accounts.get_account!(Ecto.UUID.autogenerate())
+      end
     end
+  end
 
-    test "create_account/1 with invalid data returns error changeset" do
-      assert {:error, %Ecto.Changeset{}} = Accounts.create_account(@invalid_attrs)
+  describe "update_account/2" do
+    test "success: it updates database and returns the account" do
+      existing_account = Factory.insert(:account)
+
+      params =
+        Factory.string_params_for(:account)
+        |> Map.take(["email"])
+
+      assert {:ok, returned_account} = Accounts.update_account(existing_account, params)
+
+      account_from_db = Repo.get(Account, returned_account.id)
+
+      assert returned_account == account_from_db
+
+      expected_account_data =
+        existing_account
+        |> Map.from_struct()
+        |> Map.put(:email, params["email"])
+
+      for {field, expected} <- expected_account_data do
+        actual = Map.get(account_from_db, field)
+
+        assert actual == expected, "Values did not match for field #{field}\nexpected: #{inspect(expected)}\nactual: #{inspect(actual)}"
+      end
     end
+    test "error: returns an error tuble when account can't be updated" do
+      existing_account = Factory.insert(:account)
 
-    test "update_account/2 with valid data updates the account" do
-      account = account_fixture()
-      update_attrs = %{email: "some updated email", hash_password: "some updated hash_password"}
+      bad_params = %{"email" => NaiveDateTime.utc_now()}
 
-      assert {:ok, %Account{} = account} = Accounts.update_account(account, update_attrs)
-      assert account.email == "some updated email"
-      assert account.hash_password == "some updated hash_password"
+      assert {:error, %Changeset{}} = Accounts.update_account(existing_account, bad_params)
+
+      assert existing_account == Repo.get(Account, existing_account.id)
     end
+  end
 
-    test "update_account/2 with invalid data returns error changeset" do
-      account = account_fixture()
-      assert {:error, %Ecto.Changeset{}} = Accounts.update_account(account, @invalid_attrs)
-      assert account == Accounts.get_account!(account.id)
-    end
+  describe "delete_account/1" do
+    test "success: it deletes the account" do
+      account = Factory.insert(:account)
 
-    test "delete_account/1 deletes the account" do
-      account = account_fixture()
-      assert {:ok, %Account{}} = Accounts.delete_account(account)
-      assert_raise Ecto.NoResultsError, fn -> Accounts.get_account!(account.id) end
-    end
+      assert {:ok, _deleted_account} = Accounts.delete_account(account)
 
-    test "change_account/1 returns a account changeset" do
-      account = account_fixture()
-      assert %Ecto.Changeset{} = Accounts.change_account(account)
+      refute Repo.get(Account, account.id)
     end
   end
 end
